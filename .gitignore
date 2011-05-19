@@ -1,0 +1,8 @@
+*.class
+.idea
+project/boot
+project/boot/**/*
+lib_managed
+lib_managed/**/*
+target
+target/**/*

@@ -35,44 +35,44 @@ final class MatchResult(val matched: Boolean, private val m: Regex.Match, privat
 }
 
 /**
-* Allows iteration over a series of MatchResults instances. Unlike in most
-* regular expression libraries, these instances give you access to not just which
-* substrings matched the regular expression, but also which substrings didn't.
-*
-* @see MatchResult
-*/
-  final class MatchResultIterator(val target: String, val matches: Iterator[Regex.Match], val matcher: Matcher) extends Iterator[MatchResult] {
-  private var nextStart = 0
-  private var lastEnd = 0
-  private var nextMatch: Regex.Match = null
+ * Allows iteration over a series of MatchResult instances. Unlike in most
+ * regular expression libraries, these instances give you access to not just which
+ * substrings matched the regular expression, but also which substrings didn't.
+ *
+ * @see MatchResult
+ */
+final class MatchResultIterator(val target: String, val matches: Iterator[Regex.Match], val matcher: Matcher) extends Iterator[MatchResult] {
+	private var nextStart = 0
+	private var lastEnd = 0
+	private var nextMatch: Regex.Match = null
 
-  def hasNext = nextMatch != null || matches.hasNext || lastEnd < target.length
+	def hasNext = nextMatch != null || matches.hasNext || lastEnd < target.length
 
-  private def substring(start:Int, end:Int) = {
-	  lastEnd = end
-	  new MatchResult(false, null, target.substring(start, end), matcher)
-  }
-  private def makeNextMatch = {
-	  lastEnd = nextMatch.end
-	  val tmp = nextMatch
-	  nextMatch = null
-	  new MatchResult(true, tmp, null, matcher)
-  }
+	private def substring(start:Int, end:Int) = {
+		lastEnd = end
+		new MatchResult(false, null, target.substring(start, end), matcher)
+	}
+	private def makeNextMatch = {
+		lastEnd = nextMatch.end
+		val tmp = nextMatch
+		nextMatch = null
+		new MatchResult(true, tmp, null, matcher)
+	}
 
-  def next = {
-	  if (nextMatch != null) {
-		  if (nextMatch.start > lastEnd) substring(lastEnd, target.length)
-		  else makeNextMatch
-	  } else if (!matches.hasNext) {
-		  // At this point, we know that lastEnd < target.length, otherwise
-		  // hasNext would have returned false and next would therefore not have
-		  // been called.
-		  substring(lastEnd, target.length)
-	  } else {
-		  nextMatch = matches.next
-		  if (lastEnd < nextMatch.start) substring(lastEnd, nextMatch.start)
-		  else makeNextMatch
-	  }
-  }
- }
+	def next = {
+		if (nextMatch != null) {
+			if (nextMatch.start > lastEnd) substring(lastEnd, target.length)
+			else makeNextMatch
+		} else if (!matches.hasNext) {
+			// At this point, we know that lastEnd < target.length, otherwise
+			// hasNext would have returned false and next would therefore not have
+			// been called.
+			substring(lastEnd, target.length)
+		} else {
+			nextMatch = matches.next
+			if (lastEnd < nextMatch.start) substring(lastEnd, nextMatch.start)
+			else makeNextMatch
+		}
+	}
+}
 

@@ -132,4 +132,9 @@ class RexSuite extends FunSuite {
       // for no backtracking.
       assert(CharSet("ab")*+0 & CharSet("a")**1 !~~= "ababaa")
     }
+
+	test("Parsing") {
+		val tokens = Lit("{{") | "}}" | ",," | "::"
+		for (r <- tokens.findAllIn("{{@name:: Some stuff}}")) { println(r.string)}
+	}
 }

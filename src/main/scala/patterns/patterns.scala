@@ -81,4 +81,6 @@ final case object PatSignedInt extends Matcher("(?:\\+|-)?[0-9]+")
 final case object PatPosFloat extends Matcher("[0-9]+(?:.[0-9]*)?")
 /** Like `PatPosFloat`, but allows an optional "-" or "+" at the start of the match. */
 final case object PatFloat extends Matcher("(?:\\+|-)?[0-9]+(?:.[0-9]*)?")
+/** The regex "." pattern. */
+final case object PatDot extends Matcher(".")
 

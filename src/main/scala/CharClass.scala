@@ -18,9 +18,12 @@ final protected case class FinalCharClass(set1:String, negated:Boolean, set2:Str
 }
 
 /** Defines a character class that matches any of the characters in the provided string.
+
  The string is quoted internally, so no characters have special meanings to the regex engine. (However, you
- may need to backquote-escape characters that have special meanings in strings. */
-case class CharSet(set:String) extends RawCharClass(Matcher.backQuoteCharClassSpecials(set)) {
+ may need to backquote-escape characters that have special meanings in strings.
+
+ */
+case class CharSet(set: String) extends RawCharClass(Matcher.backQuoteCharClassSpecials(set)) {
 	override val grouped = true
 }
 
@@ -33,7 +36,7 @@ case class CharRange(start:Char, end:Char) extends
 
 /** A RawCharClass does not perform escaping on the string passed to it.
  When used as a pattern, it simply wraps the string in "[]" */
-protected class RawCharClass(val chars:String) extends Matcher("[" + chars + "]") {
+protected class RawCharClass(val chars: String) extends Matcher("[" + chars + "]") {
 
 	override def anonGroup = this.pattern
 
@@ -63,47 +66,68 @@ protected class RawCharClass(val chars:String) extends Matcher("[" + chars + "]"
 
 	private def extend(orIn: RawCharClass) = new RawCharClass(this.chars + orIn.chars)
 
+	/**Produces a new char class which matches anything `this` matches, or anything in the range from the `start` char
+	 * to the `end` char, inclusive
+	 */
+	def range(start:Char, end: Char) = this extend new RawCharClass(Matcher.backQuoteCharClassSpecials(start.toString) +
+		"-" + Matcher.backQuoteCharClassSpecials(end.toString))
+
+	/** Produces a new char class which matches anything `this` matches, or anything in the string `set`. */
+	def charset(set: String) = this extend new RawCharClass(Matcher.backQuoteCharClassSpecials(set))
+
 	/** Produces a new char class which matches anything `this` matches, or any alphanumeric character. */
 	def alphanumeric = this extend patterns.CharAlnum
+
 	/** Produces a new char class which matches anything `this` matches, or any alphabetic character. */
 	def alphabetic = this extend patterns.CharAlpha
+
 	/** Produces a new char class which matches anything `this` matches, or any ASCII character. */
 	def ascii = this extend patterns.CharASCII
+
 	/** Produces a new char class which matches anything `this` matches, or any digit. */
 	def digit = this extend patterns.CharDigit
+
 	/** Produces a new char class which matches anything `this` matches, or any non-digit character. */
 	def nondigit = this extend patterns.CharNonDigit
 
 	/** Produces a new char class which matches anything `this` matches, or any blank character. */
 	def blank = this extend patterns.CharBlank
+
 	/** Produces a new char class which matches anything `this` matches, or any whitespace character. */
 	def whitespace = this extend patterns.CharWhitespace
+
 	/** Produces a new char class which matches anything `this` matches, or any non-whitespace character. */
 	def nonwhitespace = this extend patterns.CharNonWhitespace
+
 	/** Produces a new char class which matches anything `this` matches, or any space character. */
 	def space = this extend patterns.CharSpace
+
 	/** Produces a new char class which matches anything `this` matches, or any punctuation character. */
 	def punctuation = this extend patterns.CharPunct
 
 	/** Produces a new char class which matches anything `this` matches, or any lowercase character. */
 	def lower = this extend patterns.CharLower
+
 	/** Produces a new char class which matches anything `this` matches, or any uppercase character. */
 	def upper = this extend patterns.CharUpper
 
 	/** Produces a new char class which matches anything `this` matches, or any control character. */
 	def control = this extend patterns.CharCntrl
+
 	/** Produces a new char class which matches anything `this` matches, or any 'graphical' character. */
 	def graphical = this extend patterns.CharGraph
+
 	/** Produces a new char class which matches anything `this` matches, or any printable character. */
 	def printable = this extend patterns.CharPrint
 
 	/** Produces a new char class which matches anything `this` matches, or any character which is not a 'word' character. */
 	def word = this extend patterns.CharWord
+
 	/** Produces a new char class which matches anything `this` matches, or any character which is not a 'word' character. */
 	def nonword = this extend patterns.CharNonWord
+
 	/** Produces a new char class which matches anything `this` matches, or any hexadecimal digit. */
 	def hex = this extend patterns.CharXDigit
-
 }
 
 

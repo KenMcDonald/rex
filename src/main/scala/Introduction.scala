@@ -1,6 +1,6 @@
 package com.digitaldoodles
 
-/*
+/**
  * Author(s): Kenneth Murray McDonald
  * Created: 5/19/11, 2:29 PM
  * License: LGPL
@@ -20,8 +20,8 @@ package com.digitaldoodles
  *   val posInt = CharRange('0','9')*1 // *1 means 1 or more
  *   val sign = Lit("+")|"-" // Lit means literal. The "-" is automatically converted to a literal.
  *   val optionalSign = sign.optional
- *   val floatPat = optionalSign & posInt & (Lit(".") & posInt).optional // & represents concatenation
- *   val complex = floatPat.group("re") & sign.group("op") & floatPat.group("im") & "i" // "group" creates _named_ groups.
+ *   val floatPat = optionalSign +~ posInt +~ (Lit(".") +~ posInt).optional // +~ represents concatenation
+ *   val complex = floatPat.name("re") +~ sign.name("op") +~ floatPat.name("im") +~ "i" // "name" creates _named_ groups.
  * }}}
  * When the complex pattern is used to find a complex number, the real and imaginary parts,
  * and operator, can be pulled out of the MatchResult by name: 're', 'im', and 'op'.
@@ -32,7 +32,7 @@ package com.digitaldoodles
  * Notice how regular expressions in rex can be easily composed, without the necessity of worrying
  * about parenthisation and precedence. This is in sharp contrast to trying to build regular
  * expressions manually, from smaller regular expressions. In rex, anonymous groups are added
- * as needed. (If you don't know what an anonymous group is, don't worry. It's all taken care of
+ * as needed. (If you don't know what an anonymous name is, don't worry. It's all taken care of
  * for you.)
  *
  * Here's a more formal description of the
@@ -47,11 +47,11 @@ package com.digitaldoodles
  * composed into larger regular expression. This enhances readability, and makes
  * it easy to test the subparts of a complex regular expression as standalone entities.
  * Separate regular expressions can be used to build new regex's with various operators
- * such as **, &, and |, and further operators exist for character classes.
+ * such as *>, +~, and |, and further operators exist for character classes.
  *
  * - Allow groups to be named when they are defined, and then accessed by their
  * names. This is different from Scala, where the onus is on the programmer to ensure
- * that (if provided) a list of group names correctly corresponds to the parentheses
+ * that (if provided) a list of name names correctly corresponds to the parentheses
  * in a regular expression.
  *
  * - Provides a more flexible mechanism for iterating through a `findAllIn` regular
@@ -65,7 +65,7 @@ package com.digitaldoodles
  * - Provides useful predefined regular expressions. For example, there is a
  * predefined `PatFloat` that will match floating point numbers. Since
  * regular expressions can be easily combined, the regex for a complex number now
- * becomes just `PatFloat.group("re") & (Lit("-")|"+").group("sign") & PatFloat.group("im") & "i"`.
+ * becomes just `PatFloat.name("re") +~ (Lit("-")|"+~").name("sign") +~ PatFloat.name("im") +~ "i"`.
  *
  * =Constructors and Operators for Producing Rex Regular Expressions=
  *
@@ -79,10 +79,10 @@ package com.digitaldoodles
  * In addition, `rex` can test for exact matches, substring matches, or iterative searches. This will
  * be touched on later in this description, and will be documented thoroughly in the appropriate methods.
  *
- * NOTE: `+` is not a valid method of constructing a regular expression, and when used in this manner,
+ * NOTE: `+~` is not a valid method of constructing a regular expression, and when used in this manner,
  * will (usually) throw an exception. The reason for this is to avoid confusion with string concatenation,
  * as `rex` regular expressions use implicits to (when appropriate) convert from string to literal regular
- * expressions (see below). Instead of `+`, see `&`.
+ * expressions (see below). Instead of `+~`, see `+~`.
  *
  * == Common Methods of Building Regular Expressions ==
  *
@@ -93,22 +93,22 @@ package com.digitaldoodles
  * that exactly matches the given string. In rex, there are no special characters; any character in the
  * argument string is treated as that literal character.
  *
- * - ''rex1'' `&` ''rex2'': Constructs a regular expression which matches the regex in ''rex1'' followed by
- * the regex in 'rex2'. See the documentation on `&` for details.
+ * - ''rex1'' `+~` ''rex2'': Constructs a regular expression which matches the regex in ''rex1'' followed by
+ * the regex in 'rex2'. See the documentation on `+~` for details.
  *
  * - ''rex1'' `|` ''rex2'': Constructs a regular expression which matches the regex in ''rex1'' or
  * the regex in ''rex2''. See the documentation on `|` for details.
  *
- * - ''rex1'' `**` ''int'': Constructs a (greedy) regular expression which matches ''int'' or more instances of ''rex1''. See
- * the documentation on `**` (with a single int argument) for more details. Also see the section on "Greedy, Non-Greedy, and
+ * - ''rex1'' `*>` ''int'': Constructs a (greedy) regular expression which matches ''int'' or more instances of ''rex1''. See
+ * the documentation on `*>` (with a single int argument) for more details. Also see the section on "Greedy, Non-Greedy, and
  * Possessive Matches" for details on greediness.
  *
- * - ''rex1'' `** (`''int1, int2''`)`: Constructs a (greedy) regular expression which matches at least ''int1'' and
- * at most ''int2'' of ''rex1''. See the documentation on `**` (with a 2-tuple of ints for an argument) for details. Also
- * note the comments for `**`''int''.
+ * - ''rex1'' `*> (`''int1, int2''`)`: Constructs a (greedy) regular expression which matches at least ''int1'' and
+ * at most ''int2'' of ''rex1''. See the documentation on `*>` (with a 2-tuple of ints for an argument) for details. Also
+ * note the comments for `*>`''int''.
  *
- * - `CharSet(`''string''`)`: Constructs a regular expression that matches any single character in ''chars''.
- * Unlike normal regular expressions, no characters have special meanings in ''chars''; any such characters
+ * - `CharSet(`''string''`)`: Constructs a regular expression that matches any single character in ''characters''.
+ * Unlike normal regular expressions, no characters have special meanings in ''characters''; any such characters
  * are automatically escaped before being passed to [[scala.util.matching.Regex]]. See the documentation
  * on `CharSet` for details.
  *
@@ -116,8 +116,8 @@ package com.digitaldoodles
  * in the range ''charStart'' to ''charEnd'', inclusive. Character ordering is as per [[scala.util.matching.Regex]].
  * See the documentation on `CharRange` for details.
  *
- * -''r''.group(''name''): Does not change the semantics of a rex expression, but identifies the expression as one that,
- * upon a successful match, may be extracted from the match using the group name. See [[ykken.rex.MatchResult.group]]
+ * -''r''.name(''name''): Does not change the semantics of a rex expression, but identifies the expression as one that,
+ * upon a successful match, may be extracted from the match using the name name. See [[ykken.rex.MatchResult.name]]
  * for details.
  *
  * - Implicit conversion of strings to literal regexes: If ''rex'' is a rex regex, and ''op'' is a method defined on it
@@ -133,7 +133,7 @@ package com.digitaldoodles
  * These methods for building regular expressions are less commonly encountered than the above. They can be very
  * powerful, but can also make it much more difficult to debug regular expressions, so be forewarned!
  *
- * - `*?` and `*+`: Like `**`, except non-greedy and possessive, respectively. See the section on "Greedy, Non-Greedy, and
+ * - `*<` and `*!`: Like `*>`, except non-greedy and possessive, respectively. See the section on "Greedy, Non-Greedy, and
  * Possessive Matches" for details.
  *
  * - `|>`, `!|>`, `<|`, and `!<|`: These are lookahead/lookback operators. Basically, starting from wherever the current
@@ -172,8 +172,8 @@ package com.digitaldoodles
  * the following matches succeed:
  * {{{
  * Lit("b") ~= "abc" // matches the middle "b".
- * CharSet("ab")**0 ~= "aababa" //matches the entire string "aababa".
- * (Lit("a")|"b")**1 ~= "ccacc" // matches the middle "a".
+ * CharSet("ab")*>0 ~= "aababa" //matches the entire string "aababa".
+ * (Lit("a")|"b")*>1 ~= "ccacc" // matches the middle "a".
  * }}}
  *
  * `~~=` is an "identity match"; it matches only if the given regex matches the given string __in its entirety__.
@@ -190,11 +190,11 @@ package com.digitaldoodles
  *
  * One of the most common operations to do with regular expressions is to extract some substring from a given match.
  * Typically, this is done by organizing sections of the regular expression into groups using parentheses, and then
- * specifying the contents of a group according to the numbering of the leftmost parenthesis in the group. This approach
+ * specifying the contents of a name according to the numbering of the leftmost parenthesis in the name. This approach
  * is difficult and fragile, and very brittle--changing the groups in a regex also involves tracking down and changing
  * all the numeric references to those groups.
  *
- * Some languages, such as Python, allow named groups. When you group together a section of a regex, you also assign
+ * Some languages, such as Python, allow named groups. When you name together a section of a regex, you also assign
  * it a name, and that name is used to extract the contents of that particular substring of the regex. This mode of
  * work is slightly more verbose, but far more error-resistant than the numeric mode.
  *
@@ -203,16 +203,16 @@ package com.digitaldoodles
  * intentional. The advantages of named groups over numbered groups are so numerous that I'm not even going to list
  * them here.
  *
- * The standard way of defining a group in rex is just:
+ * The standard way of defining a name in rex is just:
  * {{{
- * r.group("name")
+ * r.name("name")
  * }}}
- * where ''name'' is the name desired for the given group. This should be different from any name assigned to any other
- * group.
+ * where ''name'' is the name desired for the given name. This should be different from any name assigned to any other
+ * name.
  *
  * When a match has successfully been performed, you'll get a `MatchResult` object as the result. If we call this object
- * ''m'', and the group ''name'' successfully matched in ''m'', then we can obtain the substring that was matched via
- * ''m''.group(''name'').
+ * ''m'', and the name ''name'' successfully matched in ''m'', then we can obtain the substring that was matched via
+ * ''m''.name(''name'').
  *
  * =Greedy, Non-Greedy, and Possessive Matches=
  *
@@ -223,18 +223,18 @@ package com.digitaldoodles
  *
  * First, consider the expression
  * {{{
- * Lit("a")**1 & Lit("a")**1 ~~= "aaaa"
+ * Lit("a")*>1 +~ Lit("a")*>1 ~~= "aaaa"
  * }}}
  * Should this match succeed for fail? We are asking for one or more instances of "a" followed by one or more instances of "a".
- * Depending on how the operator `**` actually works, we could have multiple possible solutions, or we could have no
+ * Depending on how the operator `*>` actually works, we could have multiple possible solutions, or we could have no
  * match at all.
  *
- * As it turns out, `**` is 'greedy' but also 'backtracking'. This means the match process will be carried out as follows:
- * 1. The first Lit("a")**1, on its first go-around, matches all of the "a"'s, leaving nothing for the second Lit("a")**1.
+ * As it turns out, `*>` is 'greedy' but also 'backtracking'. This means the match process will be carried out as follows:
+ * 1. The first Lit("a")*>1, on its first go-around, matches all of the "a"'s, leaving nothing for the second Lit("a")*>1.
  * So on this attempt, the match fails.
- * 2. BUT, `**` is backtracking, which means that it is willing to give up parts of matches in order to make the whole
- * match succeed. In this case, the first Lit("a")**1 goes back to matching only the first three "a"'s, leaving one "a"
- * for the second Lit("a")**1, and the match succeeds.
+ * 2. BUT, `*>` is backtracking, which means that it is willing to give up parts of matches in order to make the whole
+ * match succeed. In this case, the first Lit("a")*>1 goes back to matching only the first three "a"'s, leaving one "a"
+ * for the second Lit("a")*>1, and the match succeeds.
  *
  * The greedy, backtracking operator is what you will (probably) normally use. It's been around the longest, and has proven
  * the most useful.
@@ -243,17 +243,17 @@ package com.digitaldoodles
  *
  * However, there are two other ways of performing matches: Non-Greedy and Possessive. Let's look at non-greedy first.
  * {{{
- * Lit("a")*?1 & Lit("a")*?1 ~~= "aaaa"
+ * Lit("a")*<1 +~ Lit("a")*<1 ~~= "aaaa"
  * }}}
- * The big change here is the change from the greedy repetition operator (`**`) to the 'nongreedy' repetition operator,
- * `*?`. The question is will the match succeed?
+ * The big change here is the change from the greedy repetition operator (`*>`) to the 'nongreedy' repetition operator,
+ * `*<`. The question is will the match succeed?
  *
  * The answer is no, it will not, by definition, nongreedy operators consume as little input as possible. So the first
  * Lit will consume one "a", the second Lit will consume one "a", and there will be two unmatched "a"'s left over.
  *
  * There are a number of ways of fixing this (assuming it needs to be fixed). One such way is as follows:
  * {{{
- * Lit("a")*?1 & Lit("a")*?1 & BndryStringEnd ~~= "aaaa"
+ * Lit("a")*<1 +~ Lit("a")*<1 +~ BndryStringEnd ~~= "aaaa"
  * }}}
  * `BndryStringEnd` is a predefined pattern (from ykken.rex.patterns) which matches the end of a string. Nongreedy
  * operations will still consume more than the absolute minimum if that is required for the rest of the match to
@@ -266,18 +266,18 @@ package com.digitaldoodles
  * The final form of matching is the so called 'possessive' case. This is like greedy matching, but without the backtracking;
  * possessive matches never give up something they've matched.
  *
- * Let's look at a simple example, where `*+` is the possessive repetition operator. Here we go:
+ * Let's look at a simple example, where `*!` is the possessive repetition operator. Here we go:
  * {{{
- * Lit("a")*+1 & Lit("a")**1 ~~= "aaaa"
+ * Lit("a")*!1 +~ Lit("a")*>1 ~~= "aaaa"
  * }}}
  * At first glance, this doesn't seem so different from the 'greedy' example we looked at before. All we've done is to
- * substitute `*+` for `**` in one of the Lit clauses. But that makes all the difference in the world.
+ * substitute `*!` for `*>` in one of the Lit clauses. But that makes all the difference in the world.
  *
- * `*+` says, "take as much of the input as you can" (which is the same as `**`), but then goes on to say, "if you've
+ * `*!` says, "take as much of the input as you can" (which is the same as `*>`), but then goes on to say, "if you've
  * grabbed some of the input, never give it up". So what will happen?
  *
- * 1. The `Lit("a")*+1` clause will grab all of the "a"'s. Having grabbed them, it will never give them up.
- * 2. There is nothing left for the `Lit("a")**1` to grab! The match fails.
+ * 1. The `Lit("a")*!1` clause will grab all of the "a"'s. Having grabbed them, it will never give them up.
+ * 2. There is nothing left for the `Lit("a")*>1` to grab! The match fails.
  *
  * Notice the difference between backtracking behavior and non-backtracking behavior. It literally is a matter
  * of being willing to backtrack your own footsteps. If you are willing to do so, you may find a match. If not,
@@ -329,14 +329,14 @@ package com.digitaldoodles
  * Due to lack of time, I'm going to take an example exactly from the test suite:
  * {{{
  *     @Test def testReplaceAllIn() {
- *				val tagPat = "<td" & PatMinChars & ">"
+ *				val tagPat = "<td" +~ PatMinChars +~ ">"
  *				val target = "Hello<td style='color:black'>Goodbye<td >Now"
  *				assert (tagPat.replaceAllIn(target, "<td>") === "Hello<td>Goodbye<td>Now")
  *		}
  * }}}
  * `PatMinChars` is a predefined pattern that will match the minimum number of characters, consonant with
  * finding an overall match that works for the expression. Assuming we have conformant HTML (no extraneous < or >
- * characters), then `<td" & PatMinChars & ">` will match a "td" tag followed by some possible attributes, followed by
+ * characters), then `<td" +~ PatMinChars +~ ">` will match a "td" tag followed by some possible attributes, followed by
  * the closing ">".
  *
  * The key phrase here is ''tagPat.replaceAllIn(target, "<td>")''. It basically says, using the tag pattern (tagPat),

@@ -4,10 +4,9 @@ import java.io.PrintWriter
 import scala.collection.mutable
 import scala.io.Source
 
-class SBTConfig(info: ProjectInfo) extends DefaultProject(info) {
-	//val scalaToolsSnapshots = ScalaToolsSnapshots
-	val scalatest = "org.scalatest" % "scalatest" % "1.2"
-
+class Rex(info: ProjectInfo) extends DefaultProject(info) {
+	val scalaToolsSnapshots = "Scala-Tools Snapshots" at "http://scala-tools.org/repo-snapshots"
+	val scalatest = "org.scalatest" % "scalatest_2.9.0" % "1.6-SNAPSHOT"
 	lazy val jar =
 		assemblyTask(
 			assemblyTemporaryPath,

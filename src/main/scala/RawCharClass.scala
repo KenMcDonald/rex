@@ -8,14 +8,15 @@ package com.digitaldoodles.rex
 
 /** A RawCharClass does not perform escaping on the string passed to it.
  When used as a pattern, it simply wraps the string in "[]" */
-private[rex] class RawCharClass(val characters: String, val negated: Boolean = false) extends
-	Matcher("[" + (if (negated) "^" else "") + characters + "]") {
+private[rex] class RawCharClass(val characters: String, val negated: Boolean = false) extends Matcher {
+
+	private[rex] def buildPattern(nameMap: Map[String, Int]) = "[" + (if (negated) "^" else "") + characters + "]"
 
 	private[rex] val lowestPrecedenceInPattern = 0
 
 	def unary_! = new RawCharClass(characters, !negated)
 
-	override def anonGroup = this.pattern
+	override def anonGroup(nameMap: Map[String, Int]) = this.pattern
 
 	/** Char class subtraction; things in this but not in 'notin' */
 	def -(notin: RawCharClass): FinalCharClass = this /\  !notin

@@ -10,7 +10,10 @@ import com.digitaldoodles.rex.Implicits._
  * License: LGPL
  */
 
-private[rex] class SpecialChar(pattern: String) extends Matcher(pattern) {
+private[rex] class SpecialChar(pattern: String) extends Matcher {
+
+	private[rex] def buildPattern(nameMap: Map[String, Int]) = pattern
+
 	private[rex] val lowestPrecedenceInPattern = 0
 }
 

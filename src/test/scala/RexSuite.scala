@@ -35,8 +35,22 @@ class RexSuite extends FunSuite {
 		assert((("a"|"b") +~ ("c"|"d")).pattern === "(?:a|b)(?:c|d)")
 	}
 
+	test("Backreferences") {
+		val simpleQuote = CharSet("\"'").name("quote") +~ Chars.Digit*>0 +~ SameAs("quote")
+		assert(simpleQuote ~~= "\"123\"")
+		assert(simpleQuote ~~= "'123'")
+		assert(simpleQuote !~~= "\"123'")
+		val badQuote = CharSet("\"'").name("quote") +~ Chars.Digit +~ SameAs("quot")
+		intercept[NameException] { badQuote  ~~= "'123'" }
+	}
+
+	test("Group naming") {
+		intercept[NameException] { ("a".name("char") +~ "b").name("char") }
+		intercept[NameException] { "a".name("char+=") }
+		intercept[NameException] { "a".name("char") +~ "b".name("char") }
+	}
+
 	test("Grouping produces correct patterns") {
-		assert("abc".anonGroup.pattern === "(?:abc)")
 		assert((CharSet("abc").pattern === "[abc]"))
 		assert((CharRange('a','z') +~ "abc").pattern === "[a-z]abc")
 		assert("abc".lookahead.pattern === "(?=abc)")
@@ -46,7 +60,8 @@ class RexSuite extends FunSuite {
 	test("~= and ~~= match within string and exact string respectively") {
 		assert("Hello" ~~= "Hello")
 		assert(!("Hello" ~~=  "Hey, Hello"))
-		assert("ello"~="Hello")
+		assert(!("Hello" ~~=  "Hello, Hey"))
+		assert("ello" ~= "Hello")
 	}
 
 	test("special characters are escaped correctly in Lit and CharSet") {
@@ -75,14 +90,18 @@ class RexSuite extends FunSuite {
 	test("Complex number pattern") {
 		// A complex is a float followed by a + or - followed by a float, followed by an "i"
 		// The two numeric parts and the sign are named for access.
-		val complexMatcher = (Number.SignedFloat.name("re") +~ ("-"|"+").name("sign") +~ Number.SignedFloat.name("im") +~ "i").name("all")
+		val complexMatcher = Number.SignedFloat.name("re") +~ ("-"|"+").name("sign") +~ Number.SignedFloat.name("im") +~ "i"
 		/** Match against a floating-point complex number and print the result. */
 		val result = complexMatcher.findFirst("3.2+4.5i") match {
 			case None => None
 			case Some(m) => Some(m.group("re") + " " + m.group("sign") + " " + m.group("im") + "i")
 		}
 		assert(Some("3.2 + 4.5i") === result)
-		println(complexMatcher.pattern)
+
+		val doubleMatcher = complexMatcher.name("num1.") +~~ complexMatcher.name("num2.")
+		val doubleResult = doubleMatcher.findFirst("1+2i 3+4i").get
+		assert(doubleResult.group("num1.re") === "1")
+		assert(doubleResult.group("num2.im") === "4")
 	}
 
 	test("Boundary patterns") {

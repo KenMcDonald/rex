@@ -29,6 +29,19 @@ class CharClassSuite extends FunSuite {
 }
 
 class RexSuite extends FunSuite {
+	test("Automatic grouping to keep precedences working properly.") {
+		assert(("a" +~ "b" +~ "c").pattern === "abc")
+		assert(("ab"*>0).pattern === "(?:ab){0,}")
+		assert((("a"|"b") +~ ("c"|"d")).pattern === "(?:a|b)(?:c|d)")
+	}
+
+	test("Grouping produces correct patterns") {
+		assert("abc".anonGroup.pattern === "(?:abc)")
+		assert((CharSet("abc").pattern === "[abc]"))
+		assert((CharRange('a','z') +~ "abc").pattern === "[a-z]abc")
+		assert("abc".lookahead.pattern === "(?=abc)")
+		assert(("a" +~ "bc" +~ "def").pattern === "abcdef")
+	}
 
 	test("~= and ~~= match within string and exact string respectively") {
 		assert("Hello" ~~= "Hello")
@@ -62,13 +75,14 @@ class RexSuite extends FunSuite {
 	test("Complex number pattern") {
 		// A complex is a float followed by a + or - followed by a float, followed by an "i"
 		// The two numeric parts and the sign are named for access.
-		val complexMatcher = (Number.SignedFloat.name("re") +~ (Lit("-")|"+").name("sign") +~ Number.SignedFloat.name("im") +~ "i").name("all")
+		val complexMatcher = (Number.SignedFloat.name("re") +~ ("-"|"+").name("sign") +~ Number.SignedFloat.name("im") +~ "i").name("all")
 		/** Match against a floating-point complex number and print the result. */
 		val result = complexMatcher.findFirst("3.2+4.5i") match {
 			case None => None
 			case Some(m) => Some(m.group("re") + " " + m.group("sign") + " " + m.group("im") + "i")
 		}
 		assert(Some("3.2 + 4.5i") === result)
+		println(complexMatcher.pattern)
 	}
 
 	test("Boundary patterns") {
@@ -101,15 +115,6 @@ class RexSuite extends FunSuite {
 		val tagPat = Lit("<td") +~ Chars.Any*<0 +~ ">"
 		val target = "Hello<td style='color:black'>Goodbye<td >Now"
 		assert (tagPat.replaceAllIn(target, "<td>") === "Hello<td>Goodbye<td>Now")
-	}
-
-	test("Grouping produces correct patterns") {
-		assert("abc".anonGroup.pattern === "(?:abc)")
-		assert((CharSet("abc").pattern === "[abc]"))
-		assert((CharRange('a','z') +~ "abc").pattern === "[a-z](?:abc)")
-		assert("abc".lookahead.pattern === "(?=abc)")
-		assert(("a" +~ "bc" +~ "def").pattern === "(?:(?:a)(?:bc))(?:def)")
-
 	}
 
 	test("Lookahead and lookback operators") {

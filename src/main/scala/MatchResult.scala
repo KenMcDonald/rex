@@ -4,29 +4,27 @@ import util.matching.Regex
 import annotation.target
 
 /** Represents the result of a match. This can either be a successful or unsuccessful match,
- which permits MatchResults to return the strings "between" the matches when iterating a
- Matcher over a target string. To determine if a MatchResult represents a successful
- or unsuccessful result, access the `matched` boolean attribute.
-
-@param matched true if this was a successful match, false otherwise.
-@see The testing code for simple examples.
+ * which permits MatchResults to return the strings "between" the matches when iterating a
+ * Matcher over a target string. To determine if a MatchResult represents a successful
+ * or unsuccessful result, access the `matched` boolean attribute.
+ *
+ * @param matched true if this was a successful match, false otherwise.
+ * @see The testing code for simple examples.
  */
 final class MatchResult(val matched: Boolean, private val m: Regex.Match, private val s: String, private val matcher: Matcher) {
 
-	/** Retrieve a name by its name */
-	def group(name:String) = m.group(matcher.nameToGroupNumber(name))
+	/** Retrieve a group by its name */
+	def apply(name:String) = m.group(matcher.nameToGroupNumber(name))
 
-	/** Retrieve a name by its number. */
-	def group(groupNum:Int) = {
+	/** Retrieve a group by its number. */
+	private[rex] def apply(groupNum:Int) = {
 		if (!matched && groupNum == 0) s
 		else m.group(groupNum)
 	}
 
-	/** Return the entire matched string. */
-	override def toString = this.group(0)
+	/** Returns the entire matched string. */
+	def string = this(0)
 
-	/** Synonym for `toString`. */
-	def string = toString
 }
 
 /**

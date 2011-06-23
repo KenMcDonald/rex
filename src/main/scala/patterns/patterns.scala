@@ -20,10 +20,10 @@ private[rex] class SpecialChar(pattern: String) extends Matcher {
 /** Patterns having to do with lines. */
 object Line {
 	/** Matches the start of a line. */
-	case object Start extends SpecialChar("^")
+	object Start extends SpecialChar("^")
 
 	/** Matches the end of a line. */
-	case object End extends SpecialChar("$")
+	object End extends SpecialChar("$")
 
 	/** Matches an entire line. */
 	val Entire = Start +~ Chars.Any*<0 +~ End
@@ -32,11 +32,11 @@ object Line {
 /** Patterns related to words */
 object Word {
 	/** Matches a word boundary. */
-	case object Boundary extends SpecialChar("\\b")
+	object Boundary extends SpecialChar("\\b")
 
 	/** Matches a nonword boundary, i.e. a position that is entirely within a word or
 	 *entirely outside a word. */
-	case object NonBoundary extends SpecialChar("\\B")
+	object NonBoundary extends SpecialChar("\\B")
 
 	/** Matches a "word" character; this is just an alias for Chars.Word */
 	val Character = Chars.Word
@@ -54,14 +54,14 @@ object Word {
 
 object Input {
 	/** Matches the start of an input string. */
-	case object Start extends SpecialChar("\\A")
+	object Start extends SpecialChar("\\A")
 
 	/** Matches the end of an input string. */
-	case object End extends SpecialChar("\\z")
+	object End extends SpecialChar("\\z")
 	/** Matches the end of a line, except the  trailing newline will not be included. */
 
-	case object BndryPreviousMatchEnd extends SpecialChar("\\G")
-	case object BndryStringEndExceptTerminator extends SpecialChar("\\Z")
+	object BndryPreviousMatchEnd extends SpecialChar("\\G")
+	object BndryStringEndExceptTerminator extends SpecialChar("\\Z")
 }
 
 object Number {
@@ -100,4 +100,4 @@ object Number {
 }
 
 /** The regex "." pattern. */
-case object Dot extends SpecialChar(".")
+object Dot extends SpecialChar(".")

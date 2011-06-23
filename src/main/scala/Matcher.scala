@@ -26,14 +26,13 @@ private object Matcher {
  * [[scala.util.matching.Regex]] to perform the actual pattern matches.
  */
 abstract private[rex] class Matcher {
+	///////////////////////////////////////////////////////////
+	// Non-public API
+	///////////////////////////////////////////////////////////
 	private[rex] val nameToGroupNumber: Map[String, Int] = Map[String, Int]()
 	private[rex] def groupCount = 0
 
 	private[rex] def buildPattern(nameMap: Map[String, Int]): String;
-	lazy val pattern = buildPattern(nameToGroupNumber)
-	lazy val regex = new Regex(pattern)
-	/** Returns the Scala regex for this Matcher--supported to be in accord with Scala's "stringpattern".r */
-	def r = regex
 
 	/**Defines the precedence of the _lowest_-precedence regular expression operator in
 	 * this Matcher's pattern. In this case we count 0 as the highest precedence, as as
@@ -51,6 +50,26 @@ abstract private[rex] class Matcher {
 		 is already in a name of some sort. */
 	private[rex] def anonGroup(nameMap: Map[String, Int]) = "(?:" + this.buildPattern(nameMap) + ")"
 
+	private[rex] def internalName(groupName: String) = {
+		if (Matcher.privateGroupNamePat !~~= groupName) {
+			throw new NameException("Attempt to name group with illegal name: '%s'" format groupName)
+		}
+		new GroupMatcher(this, groupName)
+	}
+
+	///////////////////////////////////////////////////////////
+	// Pattern and Regex
+	///////////////////////////////////////////////////////////
+	/** The text specification of a pattern that is fed into the Java regex engine to generate an actual regex. */
+	lazy val pattern = buildPattern(nameToGroupNumber)
+	/** The Java/Scala Regex instance that does all the real work. */
+	lazy val regex = new Regex("(?m:" + pattern + ")") /* We use ?m so that ^ and $ match at the beginning and end of lines */
+	/** Returns the Scala regex for this Matcher--supported to be in accord with Scala's "stringpattern".r */
+	def r = regex
+
+	///////////////////////////////////////////////////////////
+	// Pattern Creation Methods
+	///////////////////////////////////////////////////////////
 	/** `A +~ B` tries to match against input by matching A against the initial part of the input and,
 	 * if A succeeds, matching B against the following part of the input.
 	 *
@@ -80,43 +99,77 @@ abstract private[rex] class Matcher {
 	def *<(count:Int) = new RepMatcher(this, "{" + count + ",}?")
 
 	/** Matches `count` or more instances of `this`, possessively.
-		 When a substring is matched possessively, backtracking into that substring to further
-		 the match as later processing is done is not allowed; the substring must either be accepted
-		 in its entirety within the possessive match, or rejected entirely. Depending on the regular
-		 expression, this can significantly speed things up. It can also alter the behavior of patterns
-		 in difficult-to-predict ways, so use with caution. */
+	 * When a substring is matched possessively, backtracking into that substring to further
+	 * the match as later processing is done is not allowed; the substring must either be accepted
+	 * in its entirety within the possessive match, or rejected entirely. Depending on the regular
+	 * expression, this can significantly speed things up. It can also alter the behavior of patterns
+	 * in difficult-to-predict ways, so use with caution. */
 	def *!(count:Int) = new RepMatcher(this, "{" + count + ",}+")
 
 	/** Greedily matches at least m and at most n instances of `this`, where m and n are
-		 the two elements of the `count` argument.
-
-		 @param count A 2-tuple of integers, defining a minimum and maximum number of repetitions
-		 of the pattern specified by `this`. */
+	 * the two elements of the `count` argument.
+	 *
+	 * @param count A 2-tuple of integers, defining a minimum and maximum number of repetitions
+	 * of the pattern specified by `this`. */
 	def *>(count: (Int,Int)) = new RepMatcher(this, "{" + count._1 + "," + count._2 + "}")
 
 	/** Non-greedily matches at least m and at most n instances of this, where m and n are
-		 the two elements of the `count` argument.
-
-		 @param count A 2-tuple of integers, defining a minimum and maximum number of repetitions
-		 of the pattern specified by `this`. */
+	 * the two elements of the `count` argument.
+	 *
+	 * @param count A 2-tuple of integers, defining a minimum and maximum number of repetitions
+	 * of the pattern specified by `this`. */
 	def *<(count: (Int,Int)) = new RepMatcher(this, "{" + count._1 + "," + count._2 + "}?")
 
 	/** Possessively matches at least m and at most n instances of this, where m and n are
-		 the two elements of the `count` argument.
-
-		 @param count A 2-tuple of integers, defining a minimum and maximum number of repetitions
-		 of the pattern specified by `this`. */
+	 * the two elements of the `count` argument.
+	 *
+	 * @param count A 2-tuple of integers, defining a minimum and maximum number of repetitions
+	 * of the pattern specified by `this`. */
 	def *!(count: (Int,Int)) = new RepMatcher(this, "{" + count._1 + "," + count._2 + "}+")
 
-	def optional = this *> (0,1)
-	def ? = optional
+	/** Returns a lookahead pattern match.
+     *
+     * @return A rex pattern which succeeds only if `this` matches
+     * the next piece of the string being matched against; does
+     * not consume the next piece of the string.
+	 */
+	def >> = new AnonGroup("=", this)
 
-	/** Make this pattern into a named name; the contents of the name,
-		 from a match, will be retrieved by its name, not by a number.
+	/** Returns a negated lookahead pattern match.
+     *
+     * @return A rex pattern which succeeds only if `this` does
+     * not match the next piece of the string being matched against; does
+     * not consume the next piece of the string.
+	 */
+	def !>> = new AnonGroup("!", this)
 
-		 @param name The name by which the contents matching the name may be extracted
-		 following a successful match. See the documentation for `MatchResult` for details
-		 on how to extract named groups.
+	/** Returns a lookback pattern match.
+     *
+     * @return A rex pattern which succeeds only if `this` matches
+     * the previous piece of the string being matched against; does
+     * not consume any of the input.
+	 */
+	def << = new AnonGroup("<=", this)
+
+	/** Returns a negated lookback pattern match.
+	 *
+	 * @return A rex pattern which succeeds only if `this` does
+	 * not match the previous piece of the string being matched against; does
+	 * not consume any of the input.
+	 */
+	def !<< = new AnonGroup("<!", this)
+
+	/**Makes {{code this}} optional in the match; it will match if it can, but if it cannot, the overall match
+	 * of which it is a part can still succeed.
+	 */
+	def ? = this *> (0,1)
+
+	/** Make this pattern into a named group; the contents of the group,
+	 * from a match, will be retrieved by its name, not by a number.
+	 *
+	 * @param name The name by which the contents matching the name may be extracted
+	 * following a successful match. See the documentation for `MatchResult` for details
+	 * on how to extract named groups.
 	 */
 	def name(groupName: String) = {
 		if (Matcher.publicGroupNamePat !~~= groupName) {
@@ -125,22 +178,9 @@ abstract private[rex] class Matcher {
 		new GroupMatcher(this, groupName)
 	}
 
-	def internalName(groupName: String) = {
-		if (Matcher.privateGroupNamePat !~~= groupName) {
-			throw new NameException("Attempt to name group with illegal name: '%s'" format groupName)
-		}
-		new GroupMatcher(this, groupName)
-	}
-
-	/** Wherever `this` matches within `target`, replace the
-	 *	matched subsequence with `target`.
-	 *
-	 *	@param target The string in which replacements will be done.
-	 *
-	 *	@param replacement The string that will be substituted for whatever matched `this`.
-	 */
-	def replaceAllIn(target:String, replacement:String) = regex.replaceAllIn(target, replacement)
-
+	///////////////////////////////////////////////////////////
+	// Pattern string comparison operators
+	///////////////////////////////////////////////////////////
 	/** Returns true if `this` exactly matches `target`, false otherwise. Note that by
 	 * the rules of Scala precedence, the trailing = gives this operator the lowest possible
 	 * precedence, which works well in practice. */
@@ -153,7 +193,7 @@ abstract private[rex] class Matcher {
 
 	/** Returns true if `this` matches somewhere in `target`, false otherwise. Note that by
 	 * the rules of Scala precedence, the trailing = gives this operator the lowest possible
-	 * precedence, which works will in practice.*/
+	 * precedence, which works well in practice.*/
 	def ~=(target: String): Boolean = {
 		regex.findFirstIn(target) match {
 			case None => false
@@ -163,65 +203,42 @@ abstract private[rex] class Matcher {
 
 	/** Negation of ~=. Note that by
 	 * the rules of Scala precedence, the trailing = gives this operator the lowest possible
-	 * precedence, which works will in practice.*/
+	 * precedence, which works well in practice.*/
 	def !~=(target: String) = !(this ~= target)
 
 	/** Negation of ~~=. Note that by
 	 * the rules of Scala precedence, the trailing = gives this operator the lowest possible
-	 * precedence, which works will in practice.*/
+	 * precedence, which works well in practice.*/
 	def !~~=(target: String) = !(this ~~= target)
 
-	/** Find and return the first substring in `target` matching `this`. */
-	def findFirst(target: String): Option[MatchResult] = {
+	///////////////////////////////////////////////////////////
+	// Text processing operations.
+	///////////////////////////////////////////////////////////
+	/** Find and return the first match in `target` matching `this`. */
+	def findFirstIn(target: String): Option[MatchResult] = {
 		regex.findFirstMatchIn(target) match {
 			case None => None
 			case Some(m) => Some(new MatchResult(true, m, null, this))
 		}
 	}
 
+	/** Wherever `this` matches within `target`, replace the
+	 *	matched subsequence with `replacement`.
+	 *
+	 *	@param target The string in which replacements will be done.
+	 *
+	 *	@param replacement The string that will be substituted for whatever matched `this`.
+	 */
+	def replaceAllIn(target:String, replacement:String) = regex.replaceAllIn(target, replacement)
+
+	/** Experimental feature, not suggested for production use. */
 	def apply(target: String) = new Matching(this, target)
 
 	/** This gives an iterator that iterates over both successful and failed
-		 matches. (A failed match is the text between two successful matches.) In this
-		 way, you have access to all the text in the target string.
-
-		 To see how to access results look at `MatchResult`.
+	 * matches. (A failed match is the text between two successful matches.) In this
+	 * way, you have access to all the text in the target string.
+	 *
+	 * To see how to access results look at `MatchResult`.
 	 */
 	def findAllIn(target: String) = new MatchResultIterator(target, regex.findAllIn(target).matchData, this)
-
-	/** Returns a lookahead pattern match.
-
-		 @return A rex pattern which succeeds only if `this` matches
-		 the next piece of the string being matched against; does
-		 not consume the next piece of the string.
-	 */
-	def lookahead = new AnonGroup("=" + this.pattern + ")")
-	def >> = lookahead
-
-	/** Returns a negated lookahead pattern match.
-
-		 @return A rex pattern which succeeds only if `this` does
-		 not match the next piece of the string being matched against; does
-		 not consume the next piece of the string.
-	 */
-	def notlookahead = new AnonGroup("!" + this.pattern + ")")
-	def !>> = notlookahead
-
-	/** Returns a lookback pattern match.
-
-		 @return A rex pattern which succeeds only if `this` matches
-		 the previous piece of the string being matched against; does
-		 not consume any of the input.
-	 */
-	def lookback = new AnonGroup("<=" + this.pattern + ")")
-	def << = lookback
-
-	/** Returns a negated lookback pattern match.
-
-		 @return A rex pattern which succeeds only if `this` does
-		 not match the previous piece of the string being matched against; does
-		 not consume any of the input.
-	 */
-	def notlookback = new AnonGroup("<!" + this.pattern + ")")
-	def !<< = notlookback
 }

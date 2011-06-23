@@ -7,7 +7,7 @@ package com.digitaldoodles.rex
  */
 
 /** A RawCharClass does not perform escaping on the string passed to it.
- When used as a pattern, it simply wraps the string in "[]" */
+ * When used as a pattern, it simply wraps the string in "[]" */
 private[rex] class RawCharClass(val characters: String, val negated: Boolean = false) extends Matcher {
 
 	private[rex] def buildPattern(nameMap: Map[String, Int]) = "[" + (if (negated) "^" else "") + characters + "]"

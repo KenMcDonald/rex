@@ -6,14 +6,13 @@ import scala.io.Source
 
 class Rex(info: ProjectInfo) extends DefaultProject(info) {
 	val scalaToolsSnapshots = "Scala-Tools Snapshots" at "http://scala-tools.org/repo-snapshots"
-	val scalatest = "org.scalatest" % "scalatest_2.9.0" % "1.6-SNAPSHOT"
-	lazy val jar =
-		assemblyTask(
-			assemblyTemporaryPath,
-			assemblyClasspath,
-			assemblyExtraJars,
-			assemblyExclude
-		) dependsOn(test) describedAs("Builds an optimized, single-file deployable JAR.")
+	val scalatest = "org.scalatest" % "scalatest_2.9.0" % "1.6.1"
+	assemblyTask(
+		assemblyTemporaryPath,
+		assemblyClasspath,
+		assemblyExtraJars,
+		assemblyExclude
+	) dependsOn(test) describedAs("Builds an optimized, single-file deployable JAR.")
 
 
 	override def classpathFilter = super.classpathFilter -- "*-sources.jar" -- "*-javadoc.jar"

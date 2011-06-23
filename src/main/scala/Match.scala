@@ -1,21 +1,18 @@
 package com.digitaldoodles.rex
 
 object Implicits {
+	/** Converts a string to a literal pattern. */
 	implicit def stringToLit(s:String): Matcher = Lit(s)
 }
-
-import Implicits._
-
-final case class MatchingResult(input:String, start: Int, end: Int)
 
 /**An instance of this class is thrown if the `Tokenizer` class encounters an error during its
  * attempt to process input.
  */
 class TokenizerException(message: String) extends java.lang.RuntimeException(message)
 
-final class Tokenizer[T](default: (MatchResult=>T), alternatives: (Matcher, MatchResult=>T)*) {
-	var tokenizer: Matcher = alternatives(0)._1.internalName("$alt0")
-	var processors = scala.collection.mutable.HashMap("$alt0" -> alternatives(0)._2)
+final class Tokenizer[T](default: (MatchResult => T), alternatives: Seq[(Matcher, MatchResult => T)]) {
+	private var tokenizer: Matcher = alternatives(0)._1.internalName("$alt0")
+	private var processors = scala.collection.mutable.HashMap("$alt0" -> alternatives(0)._2)
 	for (i <- 1 until alternatives.length) {
 		tokenizer = tokenizer | alternatives(i)._1.internalName("$alt" + i)
 		processors += ("$alt"+i) -> alternatives(i)._2
@@ -25,7 +22,7 @@ final class Tokenizer[T](default: (MatchResult=>T), alternatives: (Matcher, Matc
 		if (!mr.matched) default(mr)
 		else {
 			for (n <- processors.keys) {
-				if (mr.group(n) != null) {
+				if (mr(n) != null) {
 					return processors(n)(mr)
 				}
 			}
@@ -36,12 +33,16 @@ final class Tokenizer[T](default: (MatchResult=>T), alternatives: (Matcher, Matc
 	def tokenize(input: String): Seq[T] = new Matching(tokenizer, input).iterator.toSeq.map(process(_))
 }
 
+final case class MatchingResult(input:String, start: Int, end: Int)
+
 /**This class represents an instance of a regular expression (Matcher) associated with
  * an input string. It is intended for "heavy-duty" usage, for example when you have a Matcher
  * and want to do various things with it using the same input string.
+ *
+ * This class is experimental. It may disappear or be heavily modified in future versions of Rex.
  */
 final class Matching(val matcher: Matcher, val input: String) extends Iterable[MatchResult] {
-	val jMatcher = matcher.regex.pattern.matcher(input)
+	private val jMatcher = matcher.regex.pattern.matcher(input)
 	jMatcher.reset
 
 	def matchPrefix(from: Int): Option[MatchingResult] = {
@@ -70,16 +71,20 @@ final class Matching(val matcher: Matcher, val input: String) extends Iterable[M
 	}
 }
 
-private object Lit {
+object Lit {
 	/** Add a backquote immediately before any characters that have a special meaning
 	 * in regular expressions outside of character classes. */
-	def backQuoteLiteralSpecials(s: String): String =
+	private[Lit] def backQuoteLiteralSpecials(s: String): String =
 		(for (c <- s) yield (if ("[]^$\\.{,}|+*<".indexOf(c) >= 0) "\\" + c else c)).mkString("")
 }
 
-/** Define a literal pattern. This pattern is quoted internally, so no regular expression
- characters have special meanings in it. Of course, string special characters still have
- their special meanings in the string argument, if you use single-quoted strings.
+/** Defines a literal pattern.
+ *
+ * Characters with special meanings to the regex engine are backquoted
+ * internally, so do not need to be backquoted when calling this constructor, but
+ * characters with special meanings in string may still need to be backquoted.
+ * 
+ * A literal pattern matches a substring of the input that is identical to `lit`.
  */
 case class Lit(lit: String) extends Matcher {
 	private[rex] def buildPattern(nameToGroupNumber: Map[String, Int]) = Lit.backQuoteLiteralSpecials(lit)
@@ -93,7 +98,7 @@ private[rex] object BinopMatcher {
 
 /** Used in constructing binary rex operations. */
 private[rex] class BinopMatcher(val m1: Matcher, op: String, val m2: Matcher) extends Matcher {
-	val names = m1.nameToGroupNumber.keySet intersect m2.nameToGroupNumber.keySet
+	private[rex] val names = m1.nameToGroupNumber.keySet intersect m2.nameToGroupNumber.keySet
 	if (names.size > 0) {
 		throw new NameException("Attempt to create pattern with duplicate subgroup name(s): %s" format names.mkString("'", "', '", "'"))
 	}
@@ -107,13 +112,13 @@ private[rex] class BinopMatcher(val m1: Matcher, op: String, val m2: Matcher) ex
 	private[rex] val lowestPrecedenceInPattern = BinopMatcher.precedences(op)
 
 	/** Number of non-anonymous (counting) groups in this regular expression. */
-	override val groupCount = m1.groupCount + m2.groupCount
+	private[rex] override val groupCount = m1.groupCount + m2.groupCount
 
 	/** Given a name name, return its corresponding name number.
 
 		 @see Matcher.name(name)
 	 */
-	override val nameToGroupNumber = m1.nameToGroupNumber ++
+	private[rex] override val nameToGroupNumber = m1.nameToGroupNumber ++
 			m2.nameToGroupNumber.map(x => (x._1, x._2 + m1.groupCount))
 }
 
@@ -124,9 +129,9 @@ private[rex] class GroupMatcher(pat: Matcher, val name: String) extends Matcher 
 
 	private[rex] val lowestPrecedenceInPattern = 0
 
-	/** Creates a new map of name names to left parenthesis numbers by mapping over the previously existing
+	/** Creates a new map of names to left parenthesis numbers by mapping over the previously existing
 	 * map. */
-	override val nameToGroupNumber: Map[String, Int] = {
+	private[rex] override val nameToGroupNumber: Map[String, Int] = {
 		if (pat.nameToGroupNumber.contains(name)) {
 			throw new NameException("Attempt to create pattern with same name as existing subgroup name: '%s'" format name)
 		}
@@ -134,19 +139,33 @@ private[rex] class GroupMatcher(pat: Matcher, val name: String) extends Matcher 
 		else Map(name -> 1) ++ pat.nameToGroupNumber.map(x => (x._1, x._2 + 1))
 	}
 
-	override val groupCount = 1 + pat.groupCount
+	private[rex] override val groupCount = 1 + pat.groupCount
 }
 
 /** Represents an instance of an anonymous (unnumbered, unnamed) name. */
-private[rex] class AnonGroup(pattern: String) extends Matcher {
-
-	private[rex] def buildPattern(nameMap: Map[String, Int]) = "(?" + pattern
-
+private[rex] class AnonGroup(val anonType: String, val m: Matcher) extends Matcher {
+	private[rex] def buildPattern(nameMap: Map[String, Int]) = "(?" + anonType + m.buildPattern(nameMap) + ")"
 	private[rex] val lowestPrecedenceInPattern = 0
 }
 
+/**Instances of this class are thrown to indicate problems with named groups, such as duplicate names,
+ * illegal names, and so on.
+ */
 class NameException(message: String) extends java.lang.RuntimeException(message)
 
+/**Back-reference to a previously defined named group.
+ * 
+ * @param name The name of a group defined earlier in the pattern this back-reference is part of.
+ *
+ * The `SameAs` pattern will match a section of the input that is _exactly the same as_ the input
+ * matched by the group named by `name`.
+ *
+ * Note that if when `SameAs` is processed, it refers to a group that has not yet been matched, the
+ * result is, so far as I can tell, undefined. In the experiments I've tried, the match appears to
+ * simply fail.
+ *
+ * @throws NameError if `name` is not the name of a group that exists elsewhere in the pattern.
+ */
 case class SameAs(name: String) extends Matcher {
 	private[rex] val lowestPrecedenceInPattern = 0
 

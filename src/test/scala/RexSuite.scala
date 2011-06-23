@@ -11,6 +11,26 @@ import patterns._
 import org.scalatest.FunSuite
 
 class CharClassSuite extends FunSuite {
+	test("Special characters are escaped in char classes") {
+		assert(CharSet("[]-^&\\.{}")*>0 ~~= "[]-^&\\.{}")
+		assert(CharSet("-") ~~= "-")
+	}
+
+	test("CharSet functionality") {
+		assert(CharSet("abc")*>0 ~= "cde")
+		assert(CharSet("abc")*>0 !~~= "de")
+		assert(Chars.Any *> 0 ~~= "\na.,*")
+		assert(Chars.Any.pattern === "[\\s\\S]")
+		assert(Chars.Any.characters === "\\s\\S")
+		assert("[\\s\\S&&[\\p{ASCII}]]" === (Chars.Any /\ Chars.ASCII).pattern)
+		assert("[\\s\\S&&[^\\p{ASCII}]]" === (Chars.Any - Chars.ASCII).pattern)
+	}
+
+	test("CharSet negation") {
+		assert(!CharSet("abc")*>1 ~~= "def")
+		assert(!CharSet("abc")*>1 !~~= "dbf")
+	}
+
 	test("Char Class Intersection 1") {
 		val cc = CharSet("ab") /\ CharSet("bc")
 		assert(cc ~~= "b")
@@ -26,13 +46,31 @@ class CharClassSuite extends FunSuite {
 		assert(cc !~~= "b")
 		assert(cc !~~= "d")
 	}
+
+	test("Char class subtraction") {
+		assert((CharSet("abc") - CharSet("cde")) !~= "c")
+		assert((CharSet("abc") - "c") !~= "c")
+	}
+
+	test("CharClass union and subtraction operations") {
+		val alnum = Chars.Alphabetic.Digit
+		assert(alnum*>0 ~~= "abc123")
+		val alpha = Chars.Alphanumeric - Chars.Digit
+		assert(alpha*>0 ~~= "abc")
+		assert(alpha*>0 !~~= "abc123")
+		// TODO intersection
+	}
 }
 
 class RexSuite extends FunSuite {
-	test("Automatic grouping to keep precedences working properly.") {
+	test("Automatic grouping to keep precedences working properly") {
 		assert(("a" +~ "b" +~ "c").pattern === "abc")
 		assert(("ab"*>0).pattern === "(?:ab){0,}")
 		assert((("a"|"b") +~ ("c"|"d")).pattern === "(?:a|b)(?:c|d)")
+		assert((CharSet("abc").pattern === "[abc]"))
+		assert((CharRange('a','z') +~ "abc").pattern === "[a-z]abc")
+		assert("abc".>>.pattern === "(?=abc)")
+		assert(("a" +~ "bc" +~ "def").pattern === "abcdef")
 	}
 
 	test("Backreferences") {
@@ -42,84 +80,38 @@ class RexSuite extends FunSuite {
 		assert(simpleQuote !~~= "\"123'")
 		val badQuote = CharSet("\"'").name("quote") +~ Chars.Digit +~ SameAs("quot")
 		intercept[NameException] { badQuote  ~~= "'123'" }
+		val quoteMark = CharSet("\"'").name("quote")
+		val stringBody = ("\\" +~ Chars.Any | SameAs("quote").!>> +~ Chars.Any) *>0
+		val quotedString = quoteMark +~ stringBody +~ SameAs("quote")
+		assert(quotedString ~~= "\"Don't say \\\"No\\\"!\"")
+		assert(quotedString ~~= "'Don\\'t say No!'")
+		assert(quotedString !~~= "\"Don\\'t say No!'")
 	}
 
-	test("Group naming") {
+	test("Group naming exceptions") {
 		intercept[NameException] { ("a".name("char") +~ "b").name("char") }
 		intercept[NameException] { "a".name("char+=") }
 		intercept[NameException] { "a".name("char") +~ "b".name("char") }
 	}
 
-	test("Grouping produces correct patterns") {
-		assert((CharSet("abc").pattern === "[abc]"))
-		assert((CharRange('a','z') +~ "abc").pattern === "[a-z]abc")
-		assert("abc".lookahead.pattern === "(?=abc)")
-		assert(("a" +~ "bc" +~ "def").pattern === "abcdef")
-	}
-
 	test("~= and ~~= match within string and exact string respectively") {
+		assert(Chars.Any *<0 !~~= "Hello")
 		assert("Hello" ~~= "Hello")
-		assert(!("Hello" ~~=  "Hey, Hello"))
-		assert(!("Hello" ~~=  "Hello, Hey"))
+		assert("Hello" !~~=  "Hey, Hello")
+		assert("Hello" !~~=  "Hello, Hey")
 		assert("ello" ~= "Hello")
 	}
 
-	test("special characters are escaped correctly in Lit and CharSet") {
+	test("special characters are escaped correctly in Lit") {
 		assert("[]^$\\.{,}|+*<" ~~= "[]^$\\.{,}|+*<")
-		assert(CharSet("[]-^&\\.{}")*>0 ~~= "[]-^&\\.{}")
-		assert(CharSet("-") ~~= "-")
-	}
-
-	test("CharSet functionality") {
-		assert(CharSet("abc") ~= "cde")
-		assert(CharSet("abc") !~= "de")
-		assert((CharSet("abc") - CharSet("cde")) !~= "c")
-		assert((CharSet("abc") - "c") !~= "c")
-		assert((Chars.Any *> 0) ~~= "\na.,*")
-		assert(Chars.Any.pattern === "[\\s\\S]")
-		assert(Chars.Any.characters === "\\s\\S")
-		assert("[\\s\\S&&[\\p{ASCII}]]" === (Chars.Any /\ Chars.ASCII).pattern)
-		assert("[\\s\\S&&[^\\p{ASCII}]]" === (Chars.Any - Chars.ASCII).pattern)
-	}
-
-	test("CharSet negation") {
-		assert(!CharSet("abc")*>1 ~~= "def")
-		assert(!CharSet("abc")*>1 !~~= "dbf")
-	}
-
-	test("Complex number pattern") {
-		// A complex is a float followed by a + or - followed by a float, followed by an "i"
-		// The two numeric parts and the sign are named for access.
-		val complexMatcher = Number.SignedFloat.name("re") +~ ("-"|"+").name("sign") +~ Number.SignedFloat.name("im") +~ "i"
-		/** Match against a floating-point complex number and print the result. */
-		val result = complexMatcher.findFirst("3.2+4.5i") match {
-			case None => None
-			case Some(m) => Some(m.group("re") + " " + m.group("sign") + " " + m.group("im") + "i")
-		}
-		assert(Some("3.2 + 4.5i") === result)
-
-		val doubleMatcher = complexMatcher.name("num1.") +~~ complexMatcher.name("num2.")
-		val doubleResult = doubleMatcher.findFirst("1+2i 3+4i").get
-		assert(doubleResult.group("num1.re") === "1")
-		assert(doubleResult.group("num2.im") === "4")
 	}
 
 	test("Boundary patterns") {
 		assert(Input.Start +~ "a" +~ Input.End ~~= "a")
 		assert(Input.Start +~ "a" +~ Input.End +~ "a" !~~= "aa")
-		assert(Input.Start +~ Lit("a")*>0 +~ Input.End ~~= "aaa")
-		assert(Input.Start +~ Lit("a")*>(0,2) +~ Input.End !~~= "aaa")
-		// TODO many more tests
-	}
-
-	test("HTML tag pattern") {
-		val tagPat = ("<" +~ Chars.Any*<1 +~ ">").name("tag")
-		assert(tagPat ~~= "<a count=0>")
-		val minFind:String = tagPat.findFirst("<a><b>") match {
-			case None => ""
-			case Some(m) => m.group("tag")
-		}
-		assert(minFind === "<a>")
+		assert(Input.Start +~ "a"*>0 +~ Input.End ~~= "aaa")
+		assert(Input.Start +~ "a"*>(0,2) +~ Input.End !~~= "aaa")
+		assert(Line.Start +~ "A"*<0 +~ Line.End ~= "BBB\nAAA\nCCC\n")
 	}
 
 	test("Check that `findAllIn` correctly handles edge cases") {
@@ -143,39 +135,31 @@ class RexSuite extends FunSuite {
 		assert((("a" +~ "c".!>>) +~ "c") !~~= "ac")
 		assert((("x".!<< +~ "a") +~ "b") ~~= "ab")
 		assert("x" +~ CharRange('a', 'z').>> ~= "axb")
-		assert(CharRange('a', 'z').<< +~ Lit(".") ~= "a.")
-		assert(CharRange('a', 'z').<< +~ Lit(".") +~ CharRange('a', 'z').>> ~= "a.b")
-		assert(CharRange('a', 'z').<< +~ Lit(".") +~ CharRange('a', 'z').>> !~= "a .b")
-		assert(CharRange('a', 'z').<< +~ Lit(".") +~ CharRange('a', 'z').>> !~= "a. b")
-		assert(CharRange('a', 'z').<< +~ Lit(".") +~ CharRange('a', 'z').>> ~= "a.b")
-		//println("<"+(CharRange('a', 'z') <=: Lit(".") :=> CharRange('a', 'z')).findFirst("a.b").get +">")
-		assert((CharRange('a', 'z').<< +~ Lit("^") +~ CharRange('a', 'z').>>).findFirst("a^b").getOrElse("?").toString === "^")
-	}
-
-	test("CharClass union, intersection, and subtraction operations") {
-		val alnum = Chars.Alphabetic.Digit
-		assert(alnum*>0 ~~= "abc123")
-		val alpha = Chars.Alphanumeric - Chars.Digit
-		assert(alpha*>0 ~~= "abc")
-		assert(alpha*>0 !~~= "abc123")
-		// TODO intersection
+		assert(CharRange('a', 'z').<< +~ "." ~= "a.")
+		assert(CharRange('a', 'b').<< +~ "." +~ CharRange('a', 'b').>> !~= "x.y")
+		assert(CharRange('a', 'b').<< +~ "." +~ CharRange('a', 'b').>> ~= "x.y a.b")
+		assert(CharRange('a', 'z').<< +~ "." +~ CharRange('a', 'z').>> !~= "a .b")
+		assert(CharRange('a', 'z').<< +~ "." +~ CharRange('a', 'z').>> !~= "a. b")
+		//println("<"+(CharRange('a', 'z') <=: Lit(".") :=> CharRange('a', 'z')).findFirstIn("a.b").get +">")
+		assert((CharRange('a', 'z').<< +~ Lit("^") +~ CharRange('a', 'z').>>).findFirstIn("a.b a^b").get.string === "^")
 	}
 
 	test("MatchOperators") {
 		assert(Lit("aa") ~= "bbaabb")
 		assert(Lit("a")*<1 !~~= "aaa")
 		assert(Lit("\"\"\"") +~ Chars.Any*<0 +~ "\"\"\"" ~~= "\"\"\"abc\"\"\"")
-		assert(Lit("\"") +~ ((Lit("\\") +~ Chars.Any) | !CharSet("\""))*<0 +~ "\"" ~~= "\"A string\\n\\\" thing.\"")
+		assert("\"" +~ ((Lit("\\") +~ Chars.Any) | !CharSet("\""))*<0 +~ "\"" ~~= "\"A string\\n\\\" thing.\"")
 	}
 
-	test("MatchType") {
+	test("Repetition type (greedy, minimal, possessive)") {
 		assert("a"*>1 ~~= "aaa")
 		// The nongreedy match should fail because it only takes the first character.
 		assert("a"*<1 !~~= "aaa")
 		assert("a"*!1 ~~= "aaa")
 		assert("ab"*>1 ~~= "ab")
 		assert("ab"*>1 ~~= "ababab")
-		//assert("ab"*<1 +~ "ab"*>1 ~~= "ababab")
+		assert("ab"*<1 +~ "ab"*>1 ~~= "ababab")
+		assert("ab"*>1 +~ "ab"*<1 ~~= "ababab")
 		//This next should fail; the possessive operator takes all the input, and allows
 		// for no backtracking.
 		assert("ab"*!1 +~ "ab"*>1 !~~= "ababab")
@@ -186,7 +170,38 @@ class RexSuite extends FunSuite {
 	}
 
 	test("Tokenizer") {
-		val t = new Tokenizer(x=>"?", (Lit("a"), (x:MatchResult)=>"1"), (Lit("b"), (x:MatchResult)=>"2"))
+		val t = new Tokenizer(x=>"?", Seq((Lit("a"), (x:MatchResult)=>"1"), (Lit("b"), (x:MatchResult)=>"2")))
 		assert(t.tokenize("fabaabbc").mkString === "?121122?")
+	}
+}
+
+class ComplexPatternsSuite extends FunSuite {
+
+	test("Complex number pattern") {
+		// A complex is a float followed by a + or - followed by a float, followed by an "i"
+		// The two numeric parts and the sign are named for access.
+		val complexMatcher = Number.SignedFloat.name("re") +~ ("-"|"+").name("sign") +~ Number.SignedFloat.name("im") +~ "i"
+		/** Match against a floating-point complex number and print the result. */
+		val found: Option[MatchResult] = complexMatcher.findFirstIn("3.2+4.5i")
+		val complex = found match {
+			case None => None
+			case Some(mr) => mr("re") + " " + mr("sign") + " " + mr("im") + "i"
+		}
+		assert(complex === "3.2 + 4.5i")
+
+		val doubleMatcher = complexMatcher.name("num1.") +~~ complexMatcher.name("num2.")
+		val doubleResult = doubleMatcher.findFirstIn("1+2i 3+4i").get
+		assert(doubleResult("num1.re") === "1")
+		assert(doubleResult("num2.im") === "4")
+	}
+
+	test("HTML tag pattern") {
+		val tagPat = ("<" +~ Chars.Any*<1 +~ ">").name("tag")
+		assert(tagPat ~~= "<a count=0>")
+		val minFind:String = tagPat.findFirstIn("<a><b>") match {
+			case None => ""
+			case Some(m) => m("tag")
+		}
+		assert(minFind === "<a>")
 	}
 }

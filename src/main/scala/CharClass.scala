@@ -23,16 +23,17 @@ final private[rex] case class FinalCharClass(set1: RawCharClass, set2: RawCharCl
 }
 
 /** Defines a character class that matches any of the characters in the provided string.
-
- The string is quoted internally, so no characters have special meanings to the regex engine. (However, you
- may need to backquote-escape characters that have special meanings in strings.
-
+ *
+ * Characters with special meanings to the regex engine are backquoted
+ * internally, so do not need to be backquoted when calling this constructor. (However, it may
+ * be necessary to backquote characters that have special meanings in strings).
  */
 case class CharSet(set: String) extends RawCharClass(Matcher.backQuoteCharClassSpecials(set))
 
-/** Defines a character class that matches a range of characters. Characters with special meanings are backquoted
- internally, so you do not need to backquote them */
-case class CharRange(start:Char, end:Char) extends
+/** Defines a character class that matches a range of characters from `start` to `end` inclusive.
+ * Characters with special meanings to the regex engine are backquoted
+ * internally, so do not need to be backquoted when calling this constructor. */
+case class CharRange(start: Char, end: Char) extends
 	RawCharClass(Matcher.backQuoteCharClassSpecials(start.toString) +
 		"-" + Matcher.backQuoteCharClassSpecials(end.toString)
 	)

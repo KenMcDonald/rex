@@ -1,11 +1,16 @@
 package com.digitaldoodles.rex
 
-/**
+/*
  * Author(s): Kenneth Murray McDonald
  * Created: 6/14/11, 10:26 PM
  * License: LGPL
  */
 
+/**The `Chars` object defines a number of patterns, each of which matches a
+ * single character from a set of characters.
+ *
+ * For example, `Chars.Uppercase` matches a single uppercase character.
+ */
 object Chars {
 	/** Matches any single uppercase character. */
 	case object Uppercase extends RawCharClass("\\p{Upper}")

@@ -10,6 +10,17 @@ object Implicits {
  */
 class TokenizerException(message: String) extends java.lang.RuntimeException(message)
 
+/**Provides the ability to process matched subtrings in different ways, depending on which pattern they matched.
+ * A `Tokenizer` is constructed with a number of patterns and corresponding functions of type (`MatchResult` => `T`),
+ * and via the `tokenize` method, returns a Seq[T] obtained by, each time a pattern matches in the input, applying
+ * the corresponding function to the input to get a result of `T`.
+ *
+ * @param default This function is applied to sections of the input that are not matched by any of the supplied Matchers.
+ *
+ * @param alternatives: A sequence of `Matcher -> (MatchResult => T)` tuples. The `Matcher` instances are combined
+ * into a single pattern using the `|` operator, but the association between them and the function given with them
+ * is maintained.
+ */
 final class Tokenizer[T](default: (MatchResult => T), alternatives: Seq[(Matcher, MatchResult => T)]) {
 	private var tokenizer: Matcher = alternatives(0)._1.internalName("$alt0")
 	private var processors = scala.collection.mutable.HashMap("$alt0" -> alternatives(0)._2)
@@ -30,9 +41,19 @@ final class Tokenizer[T](default: (MatchResult => T), alternatives: Seq[(Matcher
 		}
 	}
 
+	/**Runs the `Tokenizer` over the given input string. The single pattern produced from the various alternative
+	 * patterns given when the `Tokenizer` was created is used to iterate through the input.
+	 * Whenever one of the subpatterns matches part of the input, its corresponding function is applied to
+     * the `MatchResult` to obtain a result of `T` that will be incorporated into the final output. For sections
+	 * of the input that fail to match any of the provided patterns, the `default` function provided when the
+	 * `Tokenizer` was created is used to process that part of the string.
+	 *
+	 * @return A `Seq[T]` produced via the process described above.
+	 */
 	def tokenize(input: String): Seq[T] = new Matching(tokenizer, input).iterator.toSeq.map(process(_))
 }
 
+/** This class is experimental; it may disappear or undergo significant changes in future versions of Rex. */
 final case class MatchingResult(input:String, start: Int, end: Int)
 
 /**This class represents an instance of a regular expression (Matcher) associated with
@@ -82,9 +103,9 @@ object Lit {
  *
  * Characters with special meanings to the regex engine are backquoted
  * internally, so do not need to be backquoted when calling this constructor, but
- * characters with special meanings in string may still need to be backquoted.
+ * characters with special meanings in strings may still need to be backquoted.
  * 
- * A literal pattern matches a substring of the input that is identical to `lit`.
+ * A literal pattern matches a substring of the input that is identical to the `lit` argument.
  */
 case class Lit(lit: String) extends Matcher {
 	private[rex] def buildPattern(nameToGroupNumber: Map[String, Int]) = Lit.backQuoteLiteralSpecials(lit)

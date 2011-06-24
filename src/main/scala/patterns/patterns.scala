@@ -52,18 +52,23 @@ object Word {
 
 }
 
+/**Patterns related to the entire input string, or to aspects of the input string
+ * that do not fit will in other categories.
+ */
 object Input {
 	/** Matches the start of an input string. */
 	object Start extends SpecialChar("\\A")
 
 	/** Matches the end of an input string. */
 	object End extends SpecialChar("\\z")
-	/** Matches the end of a line, except the  trailing newline will not be included. */
 
+	/** This is the Java \G pattern. */
 	object BndryPreviousMatchEnd extends SpecialChar("\\G")
+	/** This is the Java \Z pattern. */
 	object BndryStringEndExceptTerminator extends SpecialChar("\\Z")
 }
 
+/** Patterns related to digits and numbers. */
 object Number {
 	/** Greedily match as many digits as possible, at least one. */
 	val UnsignedInt = Chars.Digit*>1
@@ -99,5 +104,5 @@ object Number {
 	val Entire = Start +~ UnsignedInt +~ End
 }
 
-/** The regex "." pattern. */
+/** The regex "." pattern, which matches any character except end-of-line characters. */
 object Dot extends SpecialChar(".")

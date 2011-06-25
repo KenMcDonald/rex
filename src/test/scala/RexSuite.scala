@@ -170,8 +170,22 @@ class RexSuite extends FunSuite {
 	}
 
 	test("Tokenizer") {
-		val t = new Tokenizer(x=>"?", Seq((Lit("a"), (x:MatchResult)=>"1"), (Lit("b"), (x:MatchResult)=>"2")))
+		val t = new Tokenizer(
+			(mr: MatchResult) => "?",
+			Seq(
+				Lit("a") -> ((mr: MatchResult) => "1"),
+				Lit("b") -> ((mr: MatchResult) => "2")
+			)
+		)
 		assert(t.tokenize("fabaabbc").mkString === "?121122?")
+	}
+
+	test("flags") {
+		assert("Hello".ASCIICaseInsensitive ~~= "HELLO")
+		assert("Hello".ASCIICaseSensitive.ASCIICaseInsensitive !~~= "HELLO")
+		assert("Héllo".ASCIICaseInsensitive !~~= "HÉLLO")
+		assert("Héllo".UnicodeCaseInsensitive ~~= "HÉLLO")
+		assert("Héllo".UnicodeCaseSensitive.UnicodeCaseInsensitive !~~= "HÉLLO")
 	}
 }
 

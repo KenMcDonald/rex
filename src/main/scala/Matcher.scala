@@ -78,94 +78,104 @@ abstract private[rex] class Matcher {
 	 * for some unexpected associations in patterns. */
 	def +~(other:Matcher) = new BinopMatcher(this, "", other)
 
-	/**`A +~~? B` is the same as `A +~ (patterns.CharWhitespace *> 0) +~ B`. In other words, `A` followed by `B`,
+	/**`A +~~? B` is the same as `A +~ (Chars.Whitespace *> 0) +~ B`. In other words, `A` followed by `B`,
 	 * optionally separated by whitespace.
 	 */
 	def +~~?(other: Matcher) = this +~ (Chars.Whitespace *> 0) +~ other
 
-	/**`A +~~ B` is the same as `A +~ (patterns.CharWhitespace *> 1) +~ B`. In other words, `A` followed by `B`,
+	/**`A +~~ B` is the same as `A +~ (Chars.Whitespace *> 1) +~ B`. In other words, `A` followed by `B`,
 	 * separated by at least some whitespace.
 	 */
 	def +~~(other: Matcher) = this +~ (Chars.Whitespace *> 1) +~ other
 
 	/** `A | B` matches if either A matches against the input, or if B matches against the input. */
-	def |(other:Matcher) = new BinopMatcher(this, "|", other)
+	def |(other: Matcher) = new BinopMatcher(this, "|", other)
 
-	/** `A*>n` matches by first matching A against the input at least n times, and
-	 * then as many more times as possible. Most commonly, this is used as `A*>0` or `A*>1`*/
-	def *>(count:Int) = new RepMatcher(this, "{" + count + ",}")
+	/** `A*>n` matches "greedily" by first matching `A` against the input at least n times, and
+	 * then as many more times as possible while still allowing the overall match to succeed. Most commonly, this is used as `A*>0` or `A*>1`*/
+	def *>(count: Int) = new RepMatcher(this, "{" + count + ",}")
 
-	/** `A*<n` matches at least n instances of A, and then as few more as possible. */
-	def *<(count:Int) = new RepMatcher(this, "{" + count + ",}?")
+	/** `A*>n` matches "non-greedily" by first matching `A` against the input at least n times, and
+	 * then only as many more times as necessary for the overall match to succeed. Most commonly, this is used as `A*<0` or `A*<1`*/
+	def *<(count: Int) = new RepMatcher(this, "{" + count + ",}?")
 
-	/** Matches `count` or more instances of `this`, possessively.
+	/** `A*!n` matches by first matching A against the input at least n times, and
+	 * then as many more times as possible, using a possessive (non-backtracking) approach.
+	 * 
 	 * When a substring is matched possessively, backtracking into that substring to further
-	 * the match as later processing is done is not allowed; the substring must either be accepted
-	 * in its entirety within the possessive match, or rejected entirely. Depending on the regular
+	 * the match as later processing is done is not allowed; once the substring has been matched
+	 * possessively, it cannot be "unmatched" to match with other parts of the pattern. Depending on the regular
 	 * expression, this can significantly speed things up. It can also alter the behavior of patterns
 	 * in difficult-to-predict ways, so use with caution. */
 	def *!(count:Int) = new RepMatcher(this, "{" + count + ",}+")
 
-	/** Greedily matches at least m and at most n instances of `this`, where m and n are
+	/** `A*>(m, n)` greedily matches at least m and at most n instances of `A`, where m and n are
 	 * the two elements of the `count` argument.
+	 *
+	 * See `*>(count: Int)` for details on the meaning of "greedy".
 	 *
 	 * @param count A 2-tuple of integers, defining a minimum and maximum number of repetitions
 	 * of the pattern specified by `this`. */
 	def *>(count: (Int,Int)) = new RepMatcher(this, "{" + count._1 + "," + count._2 + "}")
 
-	/** Non-greedily matches at least m and at most n instances of this, where m and n are
+	/** `A*<(m, n)` non-greedily matches at least m and at most n instances of `A`, where m and n are
 	 * the two elements of the `count` argument.
+	 *
+	 * See `*<(count: Int)` for details on the meaning of "non-greedy".
 	 *
 	 * @param count A 2-tuple of integers, defining a minimum and maximum number of repetitions
 	 * of the pattern specified by `this`. */
-	def *<(count: (Int,Int)) = new RepMatcher(this, "{" + count._1 + "," + count._2 + "}?")
 
-	/** Possessively matches at least m and at most n instances of this, where m and n are
+ 	def *<(count: (Int,Int)) = new RepMatcher(this, "{" + count._1 + "," + count._2 + "}?")
+
+	/** `A*!(m, n)` possessively matches at least m and at most n instances of `A`, where m and n are
 	 * the two elements of the `count` argument.
+	 *
+	 * See `*!(count: Int)` for details on the meaning of "possessive".
 	 *
 	 * @param count A 2-tuple of integers, defining a minimum and maximum number of repetitions
 	 * of the pattern specified by `this`. */
 	def *!(count: (Int,Int)) = new RepMatcher(this, "{" + count._1 + "," + count._2 + "}+")
 
-	/** Returns a lookahead pattern match.
-     *
-     * @return A rex pattern which succeeds only if `this` matches
-     * the next piece of the string being matched against; does
-     * not consume the next piece of the string.
+	/** Lookahead operator: `A.>>` matches if `A` matches starting at the current match position; however, even if this
+	 * match succeeds, the current match position is NOT altered.
+	 *
+	 * In addition, portions of the input matched with a lookahead match are NOT included in MatchResults (unless they
+	 * are also matched by a "normal" matching operator.)
 	 */
 	def >> = new AnonGroup("=", this)
 
-	/** Returns a negated lookahead pattern match.
-     *
-     * @return A rex pattern which succeeds only if `this` does
-     * not match the next piece of the string being matched against; does
-     * not consume the next piece of the string.
+	/** Negated lookahead operator: `A.!>>` matches if `A` does NOT match starting at the current match position; however, even if this
+	 * match succeeds, the current match position is NOT altered.
+	 *
+	 * In addition, portions of the input matched with a negated lookahead match are NOT included in MatchResults (unless they
+	 * are also matched by a "normal" matching operator.)
 	 */
 	def !>> = new AnonGroup("!", this)
 
-	/** Returns a lookback pattern match.
-     *
-     * @return A rex pattern which succeeds only if `this` matches
-     * the previous piece of the string being matched against; does
-     * not consume any of the input.
+	/** Lookback operator: `A.<<` matches if `A` matches immediately before the current match position; however, even if this
+	 * match succeeds, the current match position is NOT altered.
+	 *
+	 * In addition, portions of the input matched with a lookback match are NOT included in MatchResults (unless they
+	 * are also matched by a "normal" matching operator.)
 	 */
 	def << = new AnonGroup("<=", this)
 
-	/** Returns a negated lookback pattern match.
+	/** Negated lookback operator: `A.!<<` matches if `A` does NOT match immediately before the current match position; however, even if this
+	 * match succeeds, the current match position is NOT altered.
 	 *
-	 * @return A rex pattern which succeeds only if `this` does
-	 * not match the previous piece of the string being matched against; does
-	 * not consume any of the input.
+	 * In addition, portions of the input matched with a negated lookback match are NOT included in MatchResults (unless they
+	 * are also matched by a "normal" matching operator.)
 	 */
 	def !<< = new AnonGroup("<!", this)
 
-	/**Makes {{code this}} optional in the match; it will match if it can, but if it cannot, the overall match
+	/** Makes {{code this}} optional in the match; it will match if it can, but if it cannot, the overall match
 	 * of which it is a part can still succeed.
 	 */
 	def ? = this *> (0,1)
 
 	/** Make this pattern into a named group; the contents of the group,
-	 * from a match, will be retrieved by its name, not by a number.
+	 * from a match, will be retrieved by its name.
 	 *
 	 * @param name The name by which the contents matching the name may be extracted
 	 * following a successful match. See the documentation for `MatchResult` for details
@@ -177,6 +187,21 @@ abstract private[rex] class Matcher {
 		}
 		new GroupMatcher(this, groupName)
 	}
+
+	///////////////////////////////////////////////////////////
+	// Flags
+	///////////////////////////////////////////////////////////
+	/** Makes `this` case-insensitive over the ASCII character set. */
+	def ASCIICaseInsensitive = new AnonGroup("i:", this)
+
+	/** Makes `this` case-sensitive over the ASCII character set. (This is the default.) */
+	def ASCIICaseSensitive = new AnonGroup("-i:", this)
+
+	/** Makes `this` case-insensitive over all Unicode characters. */
+	def UnicodeCaseInsensitive = new AnonGroup("iu:", this)
+
+	/** Makes `this` case-sensitive over allUnicode characters. (This is the default.) */
+	def UnicodeCaseSensitive = new AnonGroup("-iu:", this)
 
 	///////////////////////////////////////////////////////////
 	// Pattern string comparison operators
@@ -234,7 +259,7 @@ abstract private[rex] class Matcher {
 	/** Experimental feature, not suggested for production use. */
 	def apply(target: String) = new Matching(this, target)
 
-	/** This gives an iterator that iterates over both successful and failed
+	/** This returns an iterator that iterates over both successful and failed
 	 * matches. (A failed match is the text between two successful matches.) In this
 	 * way, you have access to all the text in the target string.
 	 *
